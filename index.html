@@ -99,15 +99,25 @@
         let drips = [];
 
         function resize() {
-            artCanvas.width = window.innerWidth;
-            artCanvas.height = window.innerHeight;
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+
+            artCanvas.width = w;
+            artCanvas.height = h;
+
+            renderer.setSize(w, h);
+            camera.left = w / -2;
+            camera.right = w / 2;
+            camera.top = h / 2;
+            camera.bottom = h / -2;
+            camera.updateProjectionMatrix();
         }
         window.addEventListener('resize', resize);
 
         // --- THREE.JS SCENE ---
         const threeCanvas = document.getElementById('three_canvas');
         const renderer = new THREE.WebGLRenderer({ canvas: threeCanvas, alpha: true, antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
         
         const scene = new THREE.Scene();
         const camera = new THREE.OrthographicCamera(
