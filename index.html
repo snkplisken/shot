@@ -133,15 +133,27 @@
         scene.add(dirLight);
 
         const canGroup = new THREE.Group();
+        canGroup.scale.set(CAN_SCALE, CAN_SCALE, CAN_SCALE);
         scene.add(canGroup);
+
+        let nozzleAnchor = null;
+        const nozzleWorldPos = new THREE.Vector3();
 
         const loader = new THREE.GLTFLoader();
         loader.load('penis.glb', 
             (gltf) => {
                 const model = gltf.scene;
-                model.scale.set(65, 65, 65); 
-                model.rotation.y = Math.PI; 
+                model.scale.set(65, 65, 65);
+                model.rotation.y = Math.PI;
                 canGroup.add(model);
+
+                nozzleAnchor = model.getObjectByName('output');
+
+                if (!nozzleAnchor) {
+                    nozzleAnchor = new THREE.Object3D();
+                    nozzleAnchor.position.set(0, 80, 0);
+                    model.add(nozzleAnchor);
+                }
             },
             undefined,
             () => {
@@ -156,6 +168,10 @@
                 const cap = new THREE.Mesh(capGeo, capMat);
                 cap.position.y = 55;
                 canGroup.add(cap);
+
+                nozzleAnchor = new THREE.Object3D();
+                nozzleAnchor.position.set(0, 70, 0);
+                canGroup.add(nozzleAnchor);
             }
         );
 
@@ -231,17 +247,24 @@
                 const unitX = dirX / length; const unitY = dirY / length;
 
                 canGroup.position.x = ix - w / 2;
-                canGroup.position.y = -iy + h / 2; 
+                canGroup.position.y = -iy + h / 2;
                 canGroup.rotation.z = -(Math.atan2(dirY, dirX) + Math.PI / 2);
 
                 const isPinching = Math.hypot(
-                    (landmarks[8].x - landmarks[4].x), 
+                    (landmarks[8].x - landmarks[4].x),
                     (landmarks[8].y - landmarks[4].y)
                 ) < 0.07;
 
                 if (isPinching) {
-                    const paintX = ix + (unitX * NOZZLE_OFFSET_PX);
-                    const paintY = iy + (unitY * NOZZLE_OFFSET_PX);
+                    let paintX = ix + (unitX * NOZZLE_OFFSET_PX);
+                    let paintY = iy + (unitY * NOZZLE_OFFSET_PX);
+
+                    if (nozzleAnchor) {
+                        nozzleAnchor.getWorldPosition(nozzleWorldPos);
+                        paintX = nozzleWorldPos.x + w / 2;
+                        paintY = -nozzleWorldPos.y + h / 2;
+                    }
+
                     sprayGoo(paintX, paintY, SPRAY_RADIUS);
                     lastX = paintX; lastY = paintY;
                     canGroup.scale.set(CAN_SCALE * 0.96, CAN_SCALE * 0.96, CAN_SCALE * 0.96);
