@@ -49,11 +49,79 @@
             z-index: 10;
         }
 
+        .paint-meter {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            width: 220px;
+            height: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            overflow: hidden;
+            z-index: 20;
+        }
+
+        .paint-meter__fill {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #35ffb3, #00d4ff);
+            transition: width 0.08s linear;
+        }
+
+        .paint-meter__label {
+            position: absolute;
+            top: -22px;
+            left: 0;
+            font-family: monospace;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .reset-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 30;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .reset-overlay.is-visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .reset-card {
+            background: rgba(20, 20, 20, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 24px 28px;
+            text-align: center;
+            color: #fff;
+            font-family: monospace;
+        }
+
+        .reset-card button {
+            margin-top: 16px;
+            padding: 8px 18px;
+            border-radius: 999px;
+            border: none;
+            background: #00d4ff;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
         /* SVG Filter Definition (Hidden) */
         svg { width: 0; height: 0; position: absolute; }
     </style>
 </head>
-<body data-spray-sound-url="splat.mp3" data-spray-sound-volume="0.45">
+<body data-spray-sound-url="splat.mp3" data-spray-sound-volume="0.45" data-paint-capacity="100" data-paint-drain-rate="0.7">
 
     <!-- 3D LIQUID SVG FILTER -->
     <svg>
@@ -78,11 +146,24 @@
         <!-- Replace with your PNG logo file path -->
         <img src="logo.png" alt="Logo" class="top-logo">
 
+        <div class="paint-meter" aria-label="Paint meter">
+            <div class="paint-meter__label">PAINT</div>
+            <div class="paint-meter__fill"></div>
+        </div>
+
         <video class="video_input"></video>
         <canvas id="art_canvas"></canvas>
         <canvas id="three_canvas"></canvas> 
         
         <div id="status">INITIALIZING TRACKING...</div>
+
+        <div class="reset-overlay" id="reset_overlay">
+            <div class="reset-card">
+                <div>PAINT IS EMPTY.</div>
+                <div>START OVER?</div>
+                <button type="button" id="reset_button">RESET</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -90,6 +171,9 @@
         const artCanvas = document.getElementById('art_canvas');
         const artCtx = artCanvas.getContext('2d');
         const statusText = document.getElementById('status');
+        const paintMeterFill = document.querySelector('.paint-meter__fill');
+        const resetOverlay = document.getElementById('reset_overlay');
+        const resetButton = document.getElementById('reset_button');
         
         const SPRAY_RADIUS = 35; 
         const CAN_SCALE = .7;
@@ -97,11 +181,41 @@
 
         const SPRAY_SOUND_URL = document.body.dataset.spraySoundUrl || '';
         const SPRAY_SOUND_VOLUME = Number(document.body.dataset.spraySoundVolume || 0.45);
+        const PAINT_CAPACITY = Number(document.body.dataset.paintCapacity || 100);
+        const PAINT_DRAIN_RATE = Number(document.body.dataset.paintDrainRate || 0.7);
         let sprayAudio = null;
         let isSpraying = false;
         
         let lastX = null, lastY = null;
         let drips = [];
+        const getPaintCapacity = () => (Number.isFinite(PAINT_CAPACITY) && PAINT_CAPACITY > 0 ? PAINT_CAPACITY : 100);
+        const getDrainRate = () => (Number.isFinite(PAINT_DRAIN_RATE) && PAINT_DRAIN_RATE > 0 ? PAINT_DRAIN_RATE : 0.7);
+        let paintRemaining = getPaintCapacity();
+        let isOutOfPaint = false;
+
+        function updatePaintMeter() {
+            const safeCapacity = getPaintCapacity();
+            const percentage = Math.max(0, Math.min(1, paintRemaining / safeCapacity));
+            paintMeterFill.style.width = `${percentage * 100}%`;
+        }
+
+        function setOutOfPaintState(outOfPaint) {
+            isOutOfPaint = outOfPaint;
+            resetOverlay.classList.toggle('is-visible', outOfPaint);
+            if (outOfPaint) {
+                stopSpraySound();
+            }
+        }
+
+        function resetPaintSession() {
+            paintRemaining = getPaintCapacity();
+            artCtx.clearRect(0, 0, artCanvas.width, artCanvas.height);
+            drips = [];
+            lastX = null;
+            lastY = null;
+            setOutOfPaintState(false);
+            updatePaintMeter();
+        }
 
         if (SPRAY_SOUND_URL) {
             sprayAudio = new Audio(SPRAY_SOUND_URL);
@@ -281,7 +395,7 @@
                     (landmarks[8].y - landmarks[4].y)
                 ) < 0.07;
 
-                if (isPinching) {
+                if (isPinching && !isOutOfPaint) {
                     let paintX = ix + (unitX * NOZZLE_OFFSET_PX);
                     let paintY = iy + (unitY * NOZZLE_OFFSET_PX);
 
@@ -295,6 +409,12 @@
                     lastX = paintX; lastY = paintY;
                     canGroup.scale.set(CAN_SCALE * 0.96, CAN_SCALE * 0.96, CAN_SCALE * 0.96);
                     startSpraySound();
+                    paintRemaining = Math.max(0, paintRemaining - getDrainRate());
+                    updatePaintMeter();
+
+                    if (paintRemaining <= 0) {
+                        setOutOfPaintState(true);
+                    }
                 } else {
                     lastX = null; lastY = null;
                     canGroup.scale.set(CAN_SCALE, CAN_SCALE, CAN_SCALE);
@@ -316,6 +436,13 @@
         });
         
         cameraInst.start();
+        updatePaintMeter();
+        resetButton.addEventListener('click', resetPaintSession);
+        resetOverlay.addEventListener('click', (event) => {
+            if (event.target === resetOverlay) {
+                resetPaintSession();
+            }
+        });
         animate();
     </script>
 </body>
