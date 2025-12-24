@@ -51,14 +51,10 @@
 
         .paint-meter {
             position: absolute;
-            top: 50%;
-            right: 30px;
-            transform: translateY(-50%) rotate(180deg);
-            width: 18px;
-            height: 220px;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-start;
+            top: 30px;
+            left: 30px;
+            width: 220px;
+            height: 18px;
             border: 1px solid rgba(255, 255, 255, 0.35);
             border-radius: 999px;
             background: rgba(255, 255, 255, 0.08);
@@ -67,23 +63,19 @@
         }
 
         .paint-meter__fill {
-            width: 100%;
             height: 100%;
-            background: #ffffff;
-            border-radius: 999px;
-            transition: height 0.08s linear;
-            transform-origin: top;
+            width: 100%;
+            background: linear-gradient(90deg, #35ffb3, #00d4ff);
+            transition: width 0.08s linear;
         }
 
         .paint-meter__label {
             position: absolute;
-            top: 50%;
-            right: 30px;
-            transform: translateY(-50%) rotate(-90deg);
+            top: -22px;
+            left: 0;
             font-family: monospace;
             font-size: 11px;
             color: rgba(255, 255, 255, 0.7);
-            letter-spacing: 0.2em;
         }
 
         .reset-overlay {
@@ -155,9 +147,9 @@
         <img src="logo.png" alt="Logo" class="top-logo">
 
         <div class="paint-meter" aria-label="Paint meter">
+            <div class="paint-meter__label">PAINT</div>
             <div class="paint-meter__fill"></div>
         </div>
-        <div class="paint-meter__label">PAINT</div>
 
         <video class="video_input"></video>
         <canvas id="art_canvas"></canvas>
@@ -204,7 +196,7 @@
         function updatePaintMeter() {
             const safeCapacity = getPaintCapacity();
             const percentage = Math.max(0, Math.min(1, paintRemaining / safeCapacity));
-            paintMeterFill.style.height = `${percentage * 100}%`;
+            paintMeterFill.style.width = `${percentage * 100}%`;
         }
 
         function setOutOfPaintState(outOfPaint) {
